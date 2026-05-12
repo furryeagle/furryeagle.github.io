@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TigerAI n8n Skill Pack 使用說明</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+      line-height: 1.7;
+      color: #222;
+    }
+    h1 { font-size: 1.8rem; border-bottom: 2px solid #e0e0e0; padding-bottom: 0.4rem; }
+    h2 { font-size: 1.3rem; margin-top: 2rem; border-left: 4px solid #f5a623; padding-left: 0.6rem; }
+    h3 { font-size: 1.1rem; margin-top: 1.5rem; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.95rem; }
+    th, td { border: 1px solid #ddd; padding: 0.5rem 0.8rem; text-align: left; }
+    th { background: #f5f5f5; }
+    pre, code { background: #f6f8fa; border-radius: 4px; font-family: monospace; font-size: 0.9rem; }
+    pre { padding: 1rem; overflow-x: auto; white-space: pre; }
+    code { padding: 0.1rem 0.3rem; }
+    .badge { display: inline-block; background: #f0f8ff; border: 1px solid #b0d0f0; border-radius: 4px; padding: 0.1rem 0.5rem; font-size: 0.85rem; margin-right: 0.3rem; }
+    .back { font-size: 0.9rem; margin-bottom: 1.5rem; }
+    blockquote { border-left: 4px solid #ddd; margin: 1rem 0; padding: 0.5rem 1rem; color: #555; background: #fafafa; }
+    .result-table td:nth-child(2) { font-weight: bold; }
+    footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #eee; font-size: 0.85rem; color: #888; }
+  </style>
+</head>
+<body>
+  <p class="back"><a href="index.html">← 返回主頁</a></p>
+
+  <h1>TigerAI n8n Skill Pack — 使用手冊摘要</h1>
+
+  <p>
+    <span class="badge">n8n 自動化</span>
+    <span class="badge">AI 輔助</span>
+    <span class="badge">繁體中文</span>
+  </p>
+
+  <blockquote>
+    用「跟同事講話」的方式描述需求，AI 自動產出 n8n 完整 workflow。
+    不會寫程式也能用。
+  </blockquote>
+
+  <p>
+    本頁整理自 <a href="https://github.com/MorrisLu-Taipei/TigerAI-n8n-Skill-Pack/blob/main/README.zh.md" target="_blank" rel="noopener">TigerAI n8n Skill Pack README.zh.md</a>，
+    作者 Morris Lu（n8n Taipei Ambassador）。
+  </p>
+
+  <hr />
+
+  <h2>它能做什麼？</h2>
+
+  <p>在 n8n 畫布貼一張<strong>黃色便利貼</strong>，用中文（或英文）寫出需求：</p>
+
+  <pre>每天早上 9 點抓銷售資料寄日報給老闆。
+失敗就在 Slack #ops 通知。</pre>
+
+  <p>呼叫 AI，畫布上就出現完整 workflow：</p>
+
+  <pre>┌─ 黃便利貼：你寫的需求（保留）
+├─ 中間：AI 產的節點：Schedule → HTTP → Code → Email
+└─ 藍便利貼：AI 寫的說明：credential、假設、限制、測試方法</pre>
+
+  <p>不用寫程式，不用學語法，不用記 n8n 節點名稱。</p>
+
+  <h2>三層結構（核心設計）</h2>
+
+  <pre>┌─────────────────────────────────────────────────────┐
+│ 🟡 Layer 1（黃色便利貼）：使用者需求                │
+│    「每天早上 9 點...」                              │
+│    ← AI 不會改它，永遠是 source of truth             │
+├─────────────────────────────────────────────────────┤
+│    Layer 2：AI 產出的 nodes 與連線                  │
+│    Schedule → HTTP → Code → Email                   │
+├─────────────────────────────────────────────────────┤
+│ 🔵 Layer 3（藍色便利貼）：AI 回寫的說明             │
+│    • 節點選型理由                                    │
+│    • 你需要設哪些 credential                         │
+│    • 前提假設與已知限制                              │
+│    • 怎麼測試                                        │
+└─────────────────────────────────────────────────────┘</pre>
+
+  <h2>三種使用方式</h2>
+
+  <table>
+    <tr><th>模式</th><th>何時用</th><th>觸發詞</th></tr>
+    <tr><td>🪄 Cookbook 照抄</td><td>知道要什麼，要最快</td><td>直接複製 cookbook 範例</td></tr>
+    <tr><td>💬 問答模式</td><td>完全不會描述需求</td><td>「啟用問答模式」</td></tr>
+    <tr><td>🔍 範例查詢</td><td>想先看別人怎麼做</td><td>「找跟 X 相關的範例」</td></tr>
+  </table>
+
+  <h2>你可以怎麼用（依工具）</h2>
+
+  <table>
+    <tr><th>工具</th><th>你怎麼做</th><th>AI 幫你做什麼</th></tr>
+    <tr>
+      <td><strong>Antigravity</strong></td>
+      <td>輸入 <code>/install-n8n-pack</code>，然後用自然語言描述</td>
+      <td>自動讀取需求 → 產生 workflow JSON → 透過 n8n API 部署</td>
+    </tr>
+    <tr>
+      <td><strong>Claude Code</strong></td>
+      <td>執行 <code>bash install.sh</code>，對 Claude 說「我要一個…的 workflow」</td>
+      <td>13 個 Skill 自動載入 → 產出三層結構 workflow → 可直接 import n8n</td>
+    </tr>
+    <tr>
+      <td><strong>任何 AI 助理</strong></td>
+      <td>把 cookbook 範例貼給它當 few-shot</td>
+      <td>模仿三層結構，產出符合規範的 workflow JSON</td>
+    </tr>
+  </table>
+
+  <h3>典型對話流程（30 秒理解）</h3>
+
+  <pre>你 ──> AI：「每天早上 9 點抓 Shopify 訂單，整理成日報寄給老闆，
+              失敗就在 Slack #ops 通知」
+
+AI ──> 你：✅ 已產生 workflow.json（Schedule → Shopify → Code → Email + Error → Slack）
+            ✅ 黃便利貼：保留你的原始需求
+            ✅ 藍便利貼：要設哪些 credential、限制、測試方法
+            ✅ 已透過 n8n API 部署到你的環境</pre>
+
+  <h2>解決的痛點</h2>
+
+  <table>
+    <tr><th>痛點</th><th>解法</th></tr>
+    <tr><td>AI 寫的 workflow 不一致、難 review</td><td>強制三層結構</td></tr>
+    <tr><td>使用者不會寫需求給 AI</td><td>自然語言便利貼 + 8 個 cookbook + 問答模式</td></tr>
+    <tr><td>AI 不夠懂 n8n</td><td>沿用 7 個官方 Skill + 2,061 個 workflow 語料</td></tr>
+    <tr><td>沒有企業級模式</td><td>4 大支柱：原子化 / Universal Worker / SDD / 安全</td></tr>
+    <tr><td>不知怎麼開始</td><td><code>03-FIRST-WORKFLOW.md</code> 15 分鐘手把手</td></tr>
+  </table>
+
+  <h2>真實環境驗收成績（v0.9.0 R3）</h2>
+
+  <p>對 n8n 2.10.3 + Postgres 環境跑 8 個情境：</p>
+
+  <table class="result-table">
+    <tr><th>測試層</th><th>通過率</th></tr>
+    <tr><td>JSON 結構解析</td><td>8/8（100%）</td></tr>
+    <tr><td>n8n CLI Import</td><td>8/8（100%）</td></tr>
+    <tr><td>API Activate</td><td>7/8（87.5%）— T3 因 Telegram bot token 真實檢查</td></tr>
+    <tr><td>Webhook 路由正確</td><td>4/4（100%）</td></tr>
+    <tr><td>完整 execute success</td><td>2/4（含 <code>continueOnFail</code> 設計）</td></tr>
+  </table>
+
+  <h2>建議閱讀順序</h2>
+
+  <table>
+    <tr><th>#</th><th>檔案</th><th>適合誰 / 時間</th></tr>
+    <tr><td>0️⃣</td><td>README</td><td>第一站總覽（5 分鐘）</td></tr>
+    <tr><td>1️⃣</td><td>01-INSTALL.md</td><td>第一次設定（10 分鐘）</td></tr>
+    <tr><td>2️⃣</td><td>02-USAGE-MODES.md</td><td>三種使用方式怎麼選（5 分鐘）</td></tr>
+    <tr><td>3️⃣</td><td>03-FIRST-WORKFLOW.md</td><td>跟我做：產出第一個 workflow（15 分鐘）</td></tr>
+    <tr><td>4️⃣</td><td>04-FAQ.md</td><td>卡關時查（隨時翻）</td></tr>
+  </table>
+
+  <h2>資料來源與授權</h2>
+
+  <ul>
+    <li>
+      原始文件：
+      <a href="https://github.com/MorrisLu-Taipei/TigerAI-n8n-Skill-Pack" target="_blank" rel="noopener">
+        MorrisLu-Taipei/TigerAI-n8n-Skill-Pack
+      </a>
+    </li>
+    <li><code>skills/_vendor/</code>：MIT — 來自 czlonkowski/n8n-skills</li>
+    <li><code>reference-workflows/</code>：MIT — 來自 Zie619/n8n-workflows（密鑰已替換）</li>
+    <li>其餘 TigerAI 自製內容：TigerAI Proprietary</li>
+  </ul>
+
+  <h2>遇到問題？</h2>
+
+  <p>對 AI（Claude / ChatGPT）說：</p>
+
+  <blockquote>
+    「我是新手，跟著 TigerAI Skill Pack 的 README 在做，目前看到 [檔名]，遇到 [問題]」
+  </blockquote>
+
+  <p>AI 會接手診斷。或先翻
+    <a href="https://github.com/MorrisLu-Taipei/TigerAI-n8n-Skill-Pack/blob/main/04-FAQ.md" target="_blank" rel="noopener">04-FAQ.md</a>。
+  </p>
+
+  <footer>
+    本頁整理自 TigerAI n8n Skill Pack README.zh.md，by Morris Lu（n8n Taipei Ambassador）。
+    <a href="index.html">返回主頁</a>
+  </footer>
+</body>
+</html>
