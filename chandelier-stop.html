@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>吊燈停利 (Chandelier Stop) 指標說明</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Noto Sans TC", "Segoe UI", sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      line-height: 1.7;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1a1f2e 0%, #232b3e 100%);
+      border-bottom: 1px solid #2d3748;
+      padding: 2rem 1.5rem;
+      text-align: center;
+    }
+    header h1 {
+      font-size: 1.9rem;
+      color: #63b3ed;
+      letter-spacing: 0.03em;
+    }
+    header p {
+      margin-top: 0.5rem;
+      color: #94a3b8;
+      font-size: 0.95rem;
+    }
+
+    nav {
+      text-align: center;
+      padding: 0.75rem;
+      background: #1a1f2e;
+      border-bottom: 1px solid #2d3748;
+    }
+    nav a {
+      color: #63b3ed;
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    nav a:hover { text-decoration: underline; }
+
+    main {
+      max-width: 860px;
+      margin: 2.5rem auto;
+      padding: 0 1.25rem 3rem;
+    }
+
+    section { margin-bottom: 2.5rem; }
+
+    h2 {
+      font-size: 1.2rem;
+      color: #90cdf4;
+      border-left: 4px solid #63b3ed;
+      padding-left: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    h3 {
+      font-size: 1rem;
+      color: #a0aec0;
+      margin: 1.2rem 0 0.5rem;
+    }
+
+    p { margin-bottom: 0.8rem; color: #cbd5e0; }
+
+    .card {
+      background: #1a1f2e;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    /* ---- concept boxes ---- */
+    .concept-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    @media (max-width: 560px) { .concept-grid { grid-template-columns: 1fr; } }
+
+    .concept-card {
+      background: #1a1f2e;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      padding: 1.1rem 1.3rem;
+    }
+    .concept-card.bull { border-top: 3px solid #48bb78; }
+    .concept-card.bear { border-top: 3px solid #fc8181; }
+    .concept-card h3 { margin-top: 0; }
+    .concept-card.bull h3 { color: #48bb78; }
+    .concept-card.bear h3 { color: #fc8181; }
+    .concept-card p { font-size: 0.9rem; margin-bottom: 0; }
+
+    /* ---- formula ---- */
+    .formula {
+      background: #12161f;
+      border: 1px solid #2d3748;
+      border-radius: 6px;
+      padding: 0.9rem 1.1rem;
+      font-family: "Courier New", monospace;
+      font-size: 0.92rem;
+      color: #f6e05e;
+      margin: 0.75rem 0;
+    }
+
+    /* ---- code block ---- */
+    pre {
+      background: #12161f;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      overflow-x: auto;
+      font-size: 0.85rem;
+      line-height: 1.65;
+      counter-reset: line;
+    }
+    code { font-family: "Courier New", Consolas, monospace; }
+
+    .kw  { color: #63b3ed; }   /* keywords */
+    .cm  { color: #4a5568; font-style: italic; }  /* comments */
+    .fn  { color: #b794f4; }   /* function calls */
+    .nm  { color: #68d391; }   /* variable names */
+    .nu  { color: #f6e05e; }   /* numbers */
+    .st  { color: #f6ad55; }   /* strings / labels */
+
+    /* ---- flow diagram ---- */
+    .flow {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin: 1rem 0;
+    }
+    .flow-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.9rem;
+    }
+    .flow-line {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 28px;
+    }
+    .flow-circle {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: #2d3748;
+      border: 2px solid #63b3ed;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; color: #63b3ed; font-weight: bold;
+      flex-shrink: 0;
+    }
+    .flow-connector {
+      width: 2px; background: #2d3748;
+      flex: 1; min-height: 18px; margin: 2px 0;
+    }
+    .flow-content {
+      padding: 0 0 1rem;
+    }
+    .flow-content strong { color: #e2e8f0; display: block; margin-bottom: 0.2rem; }
+    .flow-content span { font-size: 0.88rem; color: #94a3b8; }
+
+    /* ---- param table ---- */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th {
+      background: #232b3e;
+      color: #90cdf4;
+      padding: 0.65rem 0.9rem;
+      text-align: left;
+      border-bottom: 2px solid #2d3748;
+    }
+    td {
+      padding: 0.6rem 0.9rem;
+      border-bottom: 1px solid #2d3748;
+      color: #cbd5e0;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #1e2534; }
+
+    /* ---- tip box ---- */
+    .tip {
+      background: #1a2535;
+      border: 1px solid #2b6cb0;
+      border-left: 4px solid #3182ce;
+      border-radius: 6px;
+      padding: 0.9rem 1.1rem;
+      font-size: 0.9rem;
+      color: #bee3f8;
+      margin-top: 1rem;
+    }
+    .tip strong { color: #90cdf4; }
+
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      color: #4a5568;
+      font-size: 0.8rem;
+      border-top: 1px solid #2d3748;
+    }
+    footer a { color: #63b3ed; text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>吊燈停利 Chandelier Stop</h1>
+  <p>基於 ATR 的動態追蹤停利指標｜EasyLanguage 原始碼解析</p>
+</header>
+
+<nav>
+  <a href="index.html">← 返回首頁</a>
+</nav>
+
+<main>
+
+  <!-- 1. 概念說明 -->
+  <section>
+    <h2>一、指標概念</h2>
+    <p>
+      吊燈停利（Chandelier Stop / Chandelier Exit）由 Chuck LeBeau 提出，是一種<strong>以波動度為基準</strong>的追蹤停利線。
+      它將停利點「掛」在近期高點或低點之下（上），就像吊燈懸掛在天花板一樣，隨著趨勢移動而自動跟隨，但絕不逆勢拉回。
+    </p>
+
+    <div class="concept-grid">
+      <div class="concept-card bull">
+        <h3>多頭吊燈（Long Stop）</h3>
+        <p>掛在近期最高收盤之下方 n×ATR 處，停利線<strong>只上不下</strong>，保護已實現的上漲利潤。</p>
+      </div>
+      <div class="concept-card bear">
+        <h3>空頭吊燈（Short Stop）</h3>
+        <p>掛在近期最低收盤之上方 n×ATR 處，停利線<strong>只下不上</strong>，保護已實現的下跌利潤。</p>
+      </div>
+    </div>
+
+    <div class="tip">
+      <strong>核心優勢：</strong>市場波動大時，ATR 擴張，停利線自動拉開距離，不被假突破洗出場；
+      市場收斂時，ATR 縮小，停利線貼緊價格，及時鎖住獲利。
+    </div>
+  </section>
+
+  <!-- 2. 公式 -->
+  <section>
+    <h2>二、計算公式</h2>
+
+    <h3>步驟 1 — 計算吊燈距離</h3>
+    <div class="formula">吊燈距離 = ATR(_period) × _mult</div>
+
+    <h3>步驟 2 — 計算兩條停利線</h3>
+    <div class="formula">多頭停利線 = Highest(Close, _period) − 吊燈距離　← 只能上調</div>
+    <div class="formula">空頭停利線 = Lowest(Close, _period)  + 吊燈距離　← 只能下調</div>
+
+    <h3>步驟 3 — 判斷趨勢方向</h3>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-line">
+          <div class="flow-circle">1</div>
+          <div class="flow-connector"></div>
+        </div>
+        <div class="flow-content">
+          <strong>收盤 &gt; 前一根空頭停利線</strong>
+          <span>→ 方向 = 多頭（+1）</span>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-line">
+          <div class="flow-circle">2</div>
+          <div class="flow-connector"></div>
+        </div>
+        <div class="flow-content">
+          <strong>收盤 &lt; 前一根多頭停利線</strong>
+          <span>→ 方向 = 空頭（−1）</span>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-line">
+          <div class="flow-circle">3</div>
+        </div>
+        <div class="flow-content">
+          <strong>兩者都不成立</strong>
+          <span>→ 方向沿用前一根（趨勢延續）</span>
+        </div>
+      </div>
+    </div>
+
+    <h3>步驟 4 — 輸出</h3>
+    <div class="card">
+      <p style="margin:0">多頭時：繪製<span style="color:#48bb78">多頭停利線</span>（綠色）；空頭時：繪製<span style="color:#fc8181">空頭停利線</span>（紅色）。</p>
+    </div>
+  </section>
+
+  <!-- 3. 參數 -->
+  <section>
+    <h2>三、參數說明</h2>
+    <div class="card" style="padding:0; overflow:hidden;">
+      <table>
+        <thead>
+          <tr>
+            <th>參數</th>
+            <th>預設值</th>
+            <th>說明</th>
+            <th>調整建議</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>_period</code></td>
+            <td>22</td>
+            <td>ATR 計算期數，同時決定 Highest/Lowest 的回望窗口</td>
+            <td>日線建議 14–22；短線可縮至 10</td>
+          </tr>
+          <tr>
+            <td><code>_mult</code></td>
+            <td>3.0</td>
+            <td>ATR 倍數，決定停利線離價格的距離</td>
+            <td>越大越寬鬆；趨勢型策略建議 2.5–3.5</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 4. 原始碼 -->
+  <section>
+    <h2>四、EasyLanguage 原始碼</h2>
+
+    <h3>1. 變數宣告區</h3>
+    <pre><code><span class="cm">// ──────────────────────────────────────────────</span>
+<span class="cm">// 1. 變數宣告區</span>
+<span class="cm">// ──────────────────────────────────────────────</span>
+<span class="kw">input</span>:
+    <span class="nm">_period</span>(<span class="nu">22</span>, <span class="st">"ATR期數"</span>),     <span class="cm">// 看多長一段的波動度與高低點</span>
+    <span class="nm">_mult</span>(<span class="nu">3.0</span>, <span class="st">"ATR倍數"</span>);      <span class="cm">// 吊燈離價格多遠，越大越鬆</span>
+
+<span class="kw">var</span>:
+    <span class="nm">_atrv</span>(<span class="nu">0</span>),         <span class="cm">// ATR * 倍數 = 吊燈距離</span>
+    <span class="nm">_longstop</span>(<span class="nu">0</span>),     <span class="cm">// 多方停利線（只上不下）</span>
+    <span class="nm">_shortstop</span>(<span class="nu">0</span>),    <span class="cm">// 空方停利線（只下不上）</span>
+    <span class="nm">_dir</span>(<span class="nu">0</span>);          <span class="cm">// 趨勢方向：1=多, -1=空</span></code></pre>
+
+    <h3>2. 邏輯判斷區</h3>
+    <pre><code><span class="cm">// ──────────────────────────────────────────────</span>
+<span class="cm">// 2. 邏輯判斷區</span>
+<span class="cm">// ──────────────────────────────────────────────</span>
+<span class="nm">_atrv</span> = <span class="nm">_mult</span> * <span class="fn">atr</span>(<span class="nm">_period</span>);
+
+<span class="cm">// 多方停利線：近期最高(收盤) - 吊燈距離，且只能往上抬</span>
+<span class="nm">_longstop</span> = <span class="fn">highest</span>(<span class="kw">close</span>, <span class="nm">_period</span>) - <span class="nm">_atrv</span>;
+<span class="kw">if</span> <span class="fn">currentbar</span> &gt; <span class="nu">1</span> <span class="kw">then begin</span>
+    <span class="kw">if</span> <span class="kw">close</span>[<span class="nu">1</span>] &gt; <span class="nm">_longstop</span>[<span class="nu">1</span>] <span class="kw">then</span>
+        <span class="nm">_longstop</span> = <span class="fn">maxlist</span>(<span class="nm">_longstop</span>, <span class="nm">_longstop</span>[<span class="nu">1</span>]);
+<span class="kw">end</span>;
+
+<span class="cm">// 空方停利線：近期最低(收盤) + 吊燈距離，且只能往下壓</span>
+<span class="nm">_shortstop</span> = <span class="fn">lowest</span>(<span class="kw">close</span>, <span class="nm">_period</span>) + <span class="nm">_atrv</span>;
+<span class="kw">if</span> <span class="fn">currentbar</span> &gt; <span class="nu">1</span> <span class="kw">then begin</span>
+    <span class="kw">if</span> <span class="kw">close</span>[<span class="nu">1</span>] &lt; <span class="nm">_shortstop</span>[<span class="nu">1</span>] <span class="kw">then</span>
+        <span class="nm">_shortstop</span> = <span class="fn">minlist</span>(<span class="nm">_shortstop</span>, <span class="nm">_shortstop</span>[<span class="nu">1</span>]);
+<span class="kw">end</span>;
+
+<span class="cm">// 方向：突破空方線翻多、跌破多方線翻空，否則沿用</span>
+<span class="kw">if</span> <span class="fn">currentbar</span> = <span class="nu">1</span> <span class="kw">then</span>
+    <span class="nm">_dir</span> = <span class="nu">1</span>
+<span class="kw">else if</span> <span class="kw">close</span> &gt; <span class="nm">_shortstop</span>[<span class="nu">1</span>] <span class="kw">then</span>
+    <span class="nm">_dir</span> = <span class="nu">1</span>
+<span class="kw">else if</span> <span class="kw">close</span> &lt; <span class="nm">_longstop</span>[<span class="nu">1</span>] <span class="kw">then</span>
+    <span class="nm">_dir</span> = <span class="nu">-1</span>
+<span class="kw">else</span>
+    <span class="nm">_dir</span> = <span class="nm">_dir</span>[<span class="nu">1</span>];</code></pre>
+
+    <h3>3. 腳本輸出區</h3>
+    <pre><code><span class="cm">// ──────────────────────────────────────────────</span>
+<span class="cm">// 3. 腳本輸出區</span>
+<span class="cm">// ──────────────────────────────────────────────</span>
+<span class="kw">if</span> <span class="nm">_dir</span> = <span class="nu">1</span> <span class="kw">then</span>
+    <span class="fn">plot1</span>(<span class="nm">_longstop</span>, <span class="st">"多頭吊燈停利"</span>)
+<span class="kw">else</span>
+    <span class="fn">noplot</span>(<span class="nu">1</span>);
+
+<span class="kw">if</span> <span class="nm">_dir</span> = <span class="nu">-1</span> <span class="kw">then</span>
+    <span class="fn">plot2</span>(<span class="nm">_shortstop</span>, <span class="st">"空頭吊燈停利"</span>)
+<span class="kw">else</span>
+    <span class="fn">noplot</span>(<span class="nu">2</span>);</code></pre>
+  </section>
+
+  <!-- 5. 邏輯細節 -->
+  <section>
+    <h2>五、關鍵邏輯細節</h2>
+
+    <h3>為什麼停利線要用 maxlist / minlist？</h3>
+    <p>
+      原始公式每根 K 線都重新算一次 <code>Highest(Close, period) − ATR</code>，
+      如果近期最高點發生在幾根前、之後收盤回落，新算出來的線反而會比上一根更低——
+      這樣多方停利線就「往下拉」，違反「只保護不逆退」的原則。
+      用 <code>maxlist(_longstop, _longstop[1])</code> 強制取兩者較大值，確保線只能上調。
+    </p>
+
+    <h3>方向判斷的條件順序</h3>
+    <p>
+      程式先判斷「收盤 &gt; 前空頭停利線」，後判斷「收盤 &lt; 前多頭停利線」。
+      若兩條件都不成立（收盤落在兩線之間，代表震盪整理），方向沿用前一根 <code>_dir[1]</code>，
+      避免頻繁切換訊號。
+    </p>
+
+    <h3>首根 K 線初始化</h3>
+    <p>
+      <code>currentbar = 1</code> 時強制 <code>_dir = 1</code>，
+      防止 <code>_dir[1]</code> 取到未初始化的 0 值造成輸出異常。
+    </p>
+  </section>
+
+</main>
+
+<footer>
+  <p>
+    <a href="index.html">個人自動化工具說明</a>
+    &nbsp;·&nbsp;
+    <a href="terms.html">隱私權說明</a>
+  </p>
+  <p style="margin-top:0.4rem">Chandelier Stop 由 Chuck LeBeau 提出，本頁僅供學習與說明用途。</p>
+</footer>
+
+</body>
+</html>
