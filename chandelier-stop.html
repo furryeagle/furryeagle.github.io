@@ -200,6 +200,37 @@
     }
     .tip strong { color: #90cdf4; }
 
+    /* ---- tab switcher ---- */
+    .tab-group { margin-bottom: 1rem; }
+    .tab-bar {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid #2d3748;
+      margin-bottom: 0;
+    }
+    .tab-btn {
+      padding: 0.55rem 1.1rem;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      color: #718096;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-family: inherit;
+      transition: color 0.15s;
+    }
+    .tab-btn:hover { color: #a0aec0; }
+    .tab-btn.active { color: #63b3ed; border-bottom-color: #63b3ed; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ---- diff table ---- */
+    .diff-table th:first-child { width: 22%; }
+    .tag-xs   { background:#2c3a52; color:#7ec8e3; padding:1px 6px; border-radius:3px; font-size:0.78rem; }
+    .tag-pine { background:#1e3a2a; color:#68d391; padding:1px 6px; border-radius:3px; font-size:0.78rem; }
+    .tag-pl   { background:#3a2c1a; color:#f6ad55; padding:1px 6px; border-radius:3px; font-size:0.78rem; }
+
     footer {
       text-align: center;
       padding: 1.5rem;
@@ -214,7 +245,7 @@
 
 <header>
   <h1>吊燈停利 Chandelier Stop</h1>
-  <p>基於 ATR 的動態追蹤停利指標｜EasyLanguage 原始碼解析</p>
+  <p>基於 ATR 的動態追蹤停利指標｜XQ (XS) ／ Pine Script v5 ／ PowerLanguage</p>
 </header>
 
 <nav>
@@ -418,7 +449,198 @@
     </p>
   </section>
 
+
+  <!-- 6. Pine Script v5 -->
+  <section>
+    <h2>六、Pine Script v5 語法（TradingView）</h2>
+
+    <p>Pine Script 的核心差異在於：用 <code>var</code> 宣告<strong>持久變數</strong>（跨 K 棒保留值），
+    用 <code>:=</code> 對它賦值；歷史參考 <code>[1]</code> 語意與 XS 相同。</p>
+
+    <div class="tab-group">
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab(this,'pine-full')">完整程式碼</button>
+        <button class="tab-btn" onclick="switchTab(this,'pine-notes')">與 XS 的差異說明</button>
+      </div>
+
+      <div class="tab-panel active" id="pine-full">
+        <pre><code><span class="cm">// @version=5</span>
+<span class="fn">indicator</span>(<span class="st">"吊燈停利 (Chandelier Stop)"</span>, overlay=<span class="kw">true</span>)
+
+<span class="cm">// ── 參數 ──────────────────────────────────────────────────</span>
+<span class="nm">_period</span> = <span class="fn">input.int</span>(<span class="nu">22</span>,  <span class="st">"ATR 期數"</span>, minval=<span class="nu">1</span>)
+<span class="nm">_mult</span>   = <span class="fn">input.float</span>(<span class="nu">3.0</span>, <span class="st">"ATR 倍數"</span>, minval=<span class="nu">0.1</span>, step=<span class="nu">0.1</span>)
+
+<span class="cm">// ── 計算 ──────────────────────────────────────────────────</span>
+<span class="kw">float</span> <span class="nm">_atrv</span> = <span class="nm">_mult</span> * <span class="fn">ta.atr</span>(<span class="nm">_period</span>)
+
+<span class="cm">// 多方停利線（只上不下）</span>
+<span class="kw">float</span> <span class="nm">_longstop_raw</span> = <span class="fn">ta.highest</span>(<span class="kw">close</span>, <span class="nm">_period</span>) - <span class="nm">_atrv</span>
+<span class="kw">var float</span> <span class="nm">_longstop</span> = <span class="fn">na</span>
+<span class="nm">_longstop</span> := (<span class="kw">not</span> <span class="fn">na</span>(<span class="nm">_longstop</span>[<span class="nu">1</span>]) <span class="kw">and</span> <span class="kw">close</span>[<span class="nu">1</span>] &gt; <span class="nm">_longstop</span>[<span class="nu">1</span>]) ?
+             <span class="fn">math.max</span>(<span class="nm">_longstop_raw</span>, <span class="nm">_longstop</span>[<span class="nu">1</span>]) : <span class="nm">_longstop_raw</span>
+
+<span class="cm">// 空方停利線（只下不上）</span>
+<span class="kw">float</span> <span class="nm">_shortstop_raw</span> = <span class="fn">ta.lowest</span>(<span class="kw">close</span>, <span class="nm">_period</span>) + <span class="nm">_atrv</span>
+<span class="kw">var float</span> <span class="nm">_shortstop</span> = <span class="fn">na</span>
+<span class="nm">_shortstop</span> := (<span class="kw">not</span> <span class="fn">na</span>(<span class="nm">_shortstop</span>[<span class="nu">1</span>]) <span class="kw">and</span> <span class="kw">close</span>[<span class="nu">1</span>] &lt; <span class="nm">_shortstop</span>[<span class="nu">1</span>]) ?
+              <span class="fn">math.min</span>(<span class="nm">_shortstop_raw</span>, <span class="nm">_shortstop</span>[<span class="nu">1</span>]) : <span class="nm">_shortstop_raw</span>
+
+<span class="cm">// 趨勢方向</span>
+<span class="kw">var int</span> <span class="nm">_dir</span> = <span class="nu">1</span>
+<span class="nm">_dir</span> := <span class="fn">barstate.isfirst</span>          ? <span class="nu">1</span>  :
+        <span class="kw">close</span> &gt; <span class="nm">_shortstop</span>[<span class="nu">1</span>]     ? <span class="nu">1</span>  :
+        <span class="kw">close</span> &lt; <span class="nm">_longstop</span>[<span class="nu">1</span>]      ? <span class="nu">-1</span> :
+        <span class="fn">nz</span>(<span class="nm">_dir</span>[<span class="nu">1</span>], <span class="nu">1</span>)
+
+<span class="cm">// ── 輸出 ──────────────────────────────────────────────────</span>
+<span class="fn">plot</span>(<span class="nm">_dir</span> ==  <span class="nu">1</span> ? <span class="nm">_longstop</span>  : <span class="fn">na</span>, <span class="st">"多頭吊燈停利"</span>,
+     color=<span class="fn">color.new</span>(<span class="fn">color.green</span>, <span class="nu">0</span>), linewidth=<span class="nu">2</span>)
+<span class="fn">plot</span>(<span class="nm">_dir</span> == <span class="nu">-1</span> ? <span class="nm">_shortstop</span> : <span class="fn">na</span>, <span class="st">"空頭吊燈停利"</span>,
+     color=<span class="fn">color.new</span>(<span class="fn">color.red</span>,   <span class="nu">0</span>), linewidth=<span class="nu">2</span>)</code></pre>
+      </div>
+
+      <div class="tab-panel" id="pine-notes">
+        <div class="card" style="padding:0; overflow:hidden;">
+          <table class="diff-table">
+            <thead>
+              <tr><th>功能</th><th><span class="tag-xs">XQ (XS)</span></th><th><span class="tag-pine">Pine Script v5</span></th></tr>
+            </thead>
+            <tbody>
+              <tr><td>輸入整數</td><td><code>_period(22, "說明")</code></td><td><code>input.int(22, "說明")</code></td></tr>
+              <tr><td>輸入浮點數</td><td><code>_mult(3.0, "說明")</code></td><td><code>input.float(3.0, "說明")</code></td></tr>
+              <tr><td>持久變數宣告</td><td><code>var: x(0)</code></td><td><code>var float x = na</code></td></tr>
+              <tr><td>持久變數賦值</td><td><code>x = ...</code></td><td><code>x := ...</code>（用 <code>:=</code>）</td></tr>
+              <tr><td>ATR</td><td><code>atr(_period)</code></td><td><code>ta.atr(_period)</code></td></tr>
+              <tr><td>最高值</td><td><code>highest(close, n)</code></td><td><code>ta.highest(close, n)</code></td></tr>
+              <tr><td>最低值</td><td><code>lowest(close, n)</code></td><td><code>ta.lowest(close, n)</code></td></tr>
+              <tr><td>取較大</td><td><code>maxlist(a, b)</code></td><td><code>math.max(a, b)</code></td></tr>
+              <tr><td>取較小</td><td><code>minlist(a, b)</code></td><td><code>math.min(a, b)</code></td></tr>
+              <tr><td>首根判斷</td><td><code>currentbar = 1</code></td><td><code>barstate.isfirst</code></td></tr>
+              <tr><td>歷史值</td><td><code>x[1]</code></td><td><code>x[1]</code>（相同）</td></tr>
+              <tr><td>空值補零</td><td>—</td><td><code>nz(x, 0)</code></td></tr>
+              <tr><td>繪圖</td><td><code>plot1(v, "label")</code></td><td><code>plot(v, "label", color=...)</code></td></tr>
+              <tr><td>不繪圖</td><td><code>noplot(1)</code></td><td>傳入 <code>na</code>：<code>plot(na, ...)</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="tip">
+          <strong>Pine 的 <code>var</code> 關鍵字：</strong>
+          宣告時加 <code>var</code>，該變數就會像 XS 的 <code>var:</code> 一樣，在每根 K 棒之間保留上一根的值。
+          若不加 <code>var</code>，每根 K 棒都會重置為初始值。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. PowerLanguage -->
+  <section>
+    <h2>七、PowerLanguage 語法（MultiCharts）</h2>
+
+    <p>PowerLanguage 與 XS 的語法最相近，邏輯幾乎完全一致。
+    主要差異是輸入描述改用 <code>{ }</code> 大括號、關鍵字習慣 Title Case，
+    以及 <code>Inputs:</code> / <code>Vars:</code> 用複數形式。</p>
+
+    <div class="tab-group">
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab(this,'pl-full')">完整程式碼</button>
+        <button class="tab-btn" onclick="switchTab(this,'pl-notes')">與 XS 的差異說明</button>
+      </div>
+
+      <div class="tab-panel active" id="pl-full">
+        <pre><code><span class="cm">{ ──────────────────────────────────────────────</span>
+<span class="cm">  吊燈停利 (Chandelier Stop) - PowerLanguage</span>
+<span class="cm">  ────────────────────────────────────────────── }</span>
+
+<span class="cm">{ 1. 變數宣告區 }</span>
+<span class="kw">Inputs</span>:
+    <span class="nm">_period</span>(<span class="nu">22</span>),   { ATR期數 }
+    <span class="nm">_mult</span>(<span class="nu">3.0</span>);    { ATR倍數 }
+
+<span class="kw">Vars</span>:
+    <span class="nm">_atrv</span>(<span class="nu">0</span>),
+    <span class="nm">_longstop</span>(<span class="nu">0</span>),
+    <span class="nm">_shortstop</span>(<span class="nu">0</span>),
+    <span class="nm">_dir</span>(<span class="nu">0</span>);
+
+<span class="cm">{ 2. 邏輯判斷區 }</span>
+<span class="nm">_atrv</span> = <span class="nm">_mult</span> * <span class="fn">ATR</span>(<span class="nm">_period</span>);
+
+<span class="cm">{ 多方停利線：近期最高(收盤) - 吊燈距離，且只能往上抬 }</span>
+<span class="nm">_longstop</span> = <span class="fn">Highest</span>(<span class="kw">Close</span>, <span class="nm">_period</span>) - <span class="nm">_atrv</span>;
+<span class="kw">If</span> <span class="fn">CurrentBar</span> &gt; <span class="nu">1</span> <span class="kw">Then Begin</span>
+    <span class="kw">If</span> <span class="kw">Close</span>[<span class="nu">1</span>] &gt; <span class="nm">_longstop</span>[<span class="nu">1</span>] <span class="kw">Then</span>
+        <span class="nm">_longstop</span> = <span class="fn">MaxList</span>(<span class="nm">_longstop</span>, <span class="nm">_longstop</span>[<span class="nu">1</span>]);
+<span class="kw">End</span>;
+
+<span class="cm">{ 空方停利線：近期最低(收盤) + 吊燈距離，且只能往下壓 }</span>
+<span class="nm">_shortstop</span> = <span class="fn">Lowest</span>(<span class="kw">Close</span>, <span class="nm">_period</span>) + <span class="nm">_atrv</span>;
+<span class="kw">If</span> <span class="fn">CurrentBar</span> &gt; <span class="nu">1</span> <span class="kw">Then Begin</span>
+    <span class="kw">If</span> <span class="kw">Close</span>[<span class="nu">1</span>] &lt; <span class="nm">_shortstop</span>[<span class="nu">1</span>] <span class="kw">Then</span>
+        <span class="nm">_shortstop</span> = <span class="fn">MinList</span>(<span class="nm">_shortstop</span>, <span class="nm">_shortstop</span>[<span class="nu">1</span>]);
+<span class="kw">End</span>;
+
+<span class="cm">{ 方向：突破空方線翻多、跌破多方線翻空，否則沿用 }</span>
+<span class="kw">If</span> <span class="fn">CurrentBar</span> = <span class="nu">1</span> <span class="kw">Then</span>
+    <span class="nm">_dir</span> = <span class="nu">1</span>
+<span class="kw">Else If</span> <span class="kw">Close</span> &gt; <span class="nm">_shortstop</span>[<span class="nu">1</span>] <span class="kw">Then</span>
+    <span class="nm">_dir</span> = <span class="nu">1</span>
+<span class="kw">Else If</span> <span class="kw">Close</span> &lt; <span class="nm">_longstop</span>[<span class="nu">1</span>] <span class="kw">Then</span>
+    <span class="nm">_dir</span> = <span class="nu">-1</span>
+<span class="kw">Else</span>
+    <span class="nm">_dir</span> = <span class="nm">_dir</span>[<span class="nu">1</span>];
+
+<span class="cm">{ 3. 腳本輸出區 }</span>
+<span class="kw">If</span> <span class="nm">_dir</span> = <span class="nu">1</span> <span class="kw">Then</span>
+    <span class="fn">Plot1</span>(<span class="nm">_longstop</span>, <span class="st">"多頭吊燈停利"</span>)
+<span class="kw">Else</span>
+    <span class="fn">NoPlot</span>(<span class="nu">1</span>);
+
+<span class="kw">If</span> <span class="nm">_dir</span> = <span class="nu">-1</span> <span class="kw">Then</span>
+    <span class="fn">Plot2</span>(<span class="nm">_shortstop</span>, <span class="st">"空頭吊燈停利"</span>)
+<span class="kw">Else</span>
+    <span class="fn">NoPlot</span>(<span class="nu">2</span>);</code></pre>
+      </div>
+
+      <div class="tab-panel" id="pl-notes">
+        <div class="card" style="padding:0; overflow:hidden;">
+          <table class="diff-table">
+            <thead>
+              <tr><th>功能</th><th><span class="tag-xs">XQ (XS)</span></th><th><span class="tag-pl">PowerLanguage</span></th></tr>
+            </thead>
+            <tbody>
+              <tr><td>區塊宣告</td><td><code>input:</code> / <code>var:</code></td><td><code>Inputs:</code> / <code>Vars:</code>（複數）</td></tr>
+              <tr><td>輸入描述</td><td><code>x(22, "說明")</code></td><td><code>x(22) { 說明 }</code>（大括號）</td></tr>
+              <tr><td>大小寫</td><td>不敏感，慣用小寫</td><td>不敏感，慣用 Title Case</td></tr>
+              <tr><td>註解</td><td><code>// 單行</code></td><td><code>{ 區塊 }</code> 或 <code>// 單行</code></td></tr>
+              <tr><td>ATR</td><td><code>atr()</code></td><td><code>ATR()</code>（同名，僅大小寫不同）</td></tr>
+              <tr><td>Highest/Lowest</td><td><code>highest()</code> / <code>lowest()</code></td><td><code>Highest()</code> / <code>Lowest()</code></td></tr>
+              <tr><td>取較大/小</td><td><code>maxlist(a,b)</code> / <code>minlist(a,b)</code></td><td><code>MaxList(a,b)</code> / <code>MinList(a,b)</code></td></tr>
+              <tr><td>繪圖</td><td><code>plot1(v, "label")</code></td><td><code>Plot1(v, "label")</code></td></tr>
+              <tr><td>不繪圖</td><td><code>noplot(1)</code></td><td><code>NoPlot(1)</code></td></tr>
+              <tr><td>邏輯結構</td><td colspan="2" style="color:#68d391; text-align:center;">完全相同，可直接對照移植</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="tip">
+          <strong>移植難度：</strong>PowerLanguage ≈ XS（幾乎零改動），Pine Script 需注意
+          <code>var</code> 持久變數與 <code>:=</code> 賦值語法，其餘邏輯可逐行對照。
+        </div>
+      </div>
+    </div>
+  </section>
+
 </main>
+
+<script>
+function switchTab(btn, panelId) {
+  const group = btn.closest('.tab-group');
+  group.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  group.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  group.querySelector('#' + panelId).classList.add('active');
+}
+</script>
 
 <footer>
   <p>
