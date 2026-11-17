@@ -159,11 +159,18 @@ function defaults() {
       c('利息','🏦','#14b8a6','inc'), c('其他收入','➕','#64748b','inc'),
     ],
     records: [], budget: {total: 0, cats: {}},
+    inbox: [], auto: {url: '', key: '', last: 1},
   };
 }
 function load() {
-  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && Array.isArray(s.records)) return s; } catch (e) {}
+  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && Array.isArray(s.records)) return norm(s); } catch (e) {}
   return defaults();
+}
+function norm(s) { // 補上舊版資料沒有的欄位
+  s.budget = s.budget || {total: 0, cats: {}}; s.budget.cats = s.budget.cats || {};
+  s.inbox = Array.isArray(s.inbox) ? s.inbox : [];
+  s.auto = Object.assign({url: '', key: '', last: 1}, s.auto || {});
+  return s;
 }
 let S = load();
 function save() {
@@ -282,7 +289,8 @@ function viewHome() {
   const merHtml = top.length ? `<div class="card"><h2>商家排行</h2>${top.map(([n, v], i) => `<div class="row" style="padding:5px 0"><span class="muted small" style="width:18px">${i + 1}</span><span class="sp t1" style="font-weight:500">${esc(n)}</span><b class="num">${fmt(v)}</b></div>`).join('')}</div>` : '';
 
   const recent = sortRecs(rs).slice(0, 5);
-  return `${monthBar()}
+  const inboxBar = S.inbox.length ? `<button class="card row" style="width:100%;text-align:left;background:var(--accent-soft)" data-act="inbox"><span style="font-size:20px">📥</span><b class="sp">${S.inbox.length} 則通知待確認</b><span class="muted">›</span></button>` : '';
+  return `${monthBar()}${inboxBar}
     <div class="card"><div class="muted small">本月支出</div><div class="big num">${fmt(exp)}</div><div class="muted small">${cmp}</div>
       <div class="grid2"><div class="stat"><span class="muted small">收入</span><b class="num inc">${fmt(inc)}</b></div>
       <div class="stat"><span class="muted small">結餘</span><b class="num ${inc - exp < 0 ? 'exp' : ''}">${fmt(inc - exp)}</b></div></div></div>
@@ -354,6 +362,9 @@ function viewSet() {
       ${row('budget', '🎯', '預算', bt ? `每月 ${fmt(bt)}` : '尚未設定')}
       ${row('cats', '🏷️', '支出分類', `${S.categories.filter(c => c.kind === 'exp').length} 個`, 'exp')}
       ${row('cats', '🏷️', '收入分類', `${S.categories.filter(c => c.kind === 'inc').length} 個`, 'inc')}</div>
+    <div class="card"><h2>自動記帳</h2>
+      ${row('inbox', '📥', '匯入紀錄', S.inbox.length ? `${S.inbox.length} 則待確認` : '沒有待確認的通知')}
+      ${row('autoSet', '🤖', '通知自動記帳設定', S.auto.url ? '已連結' : '尚未設定')}</div>
     <div class="card"><h2>一般</h2>
       ${row('theme', '🌓', '主題顏色', th[S.theme || 'auto'])}</div>
     <div class="card"><h2>資料</h2>
@@ -408,6 +419,7 @@ function drawAcc(id) {
     <label class="f"><span>名稱</span><input class="inp" id="a-name" value="${esc(a ? a.name : '')}" placeholder="例如：國泰 CUBE 卡" /></label>
     <label class="f"><span>類型</span><select class="inp" id="a-type">${Object.entries(ACC_TYPES).map(([k, v]) => `<option value="${k}" ${a && a.type === k ? 'selected' : ''}>${v[1]} ${v[0]}</option>`).join('')}</select></label>
     <label class="f"><span>${a ? '現在實際餘額（修改後會自動調整）' : '目前餘額'}　信用卡欠款請填負數</span><input class="inp" id="a-bal" type="number" inputmode="decimal" step="any" value="${bal === '' ? '' : Math.round(bal * 100) / 100}" placeholder="0" /></label>
+    <label class="f"><span>卡號末四碼（選填，用來對應刷卡通知）</span><input class="inp" id="a-last4" inputmode="numeric" maxlength="4" value="${esc(a ? a.last4 || '' : '')}" placeholder="例如 8177" /></label>
     <button class="btn" data-act="saveAcc" data-v="${a ? a.id : ''}">儲存</button>
     ${a ? `<button class="btn danger" data-act="delAcc" data-v="${a.id}">刪除帳戶</button>` : ''}`);
 }
@@ -436,6 +448,116 @@ function drawBudget() {
     <h2>分類額度（選填）</h2>
     ${cs.map(c => `<div class="row" style="margin-bottom:8px"><div class="ico" style="${tint(c.color)}">${esc(c.icon)}</div><span class="sp t1">${esc(c.name)}</span><input class="inp b-cat" data-id="${c.id}" style="width:130px;text-align:right" type="number" inputmode="decimal" min="0" step="any" value="${Number(S.budget.cats[c.id]) || ''}" placeholder="不設定" /></div>`).join('')}
     <button class="btn" style="margin-top:8px" data-act="saveBudget">儲存</button>`);
+}
+
+/* ========== 通知自動記帳 ========== */
+// 把一則通知（app / title / text / ts）解析成 {amount, date, merchant, last4, source}
+function parseNotif(n) {
+  const app = String(n.app || '').normalize('NFKC');
+  const t = (String(n.title || '') + '\n' + String(n.text || '')).normalize('NFKC').replace(/[ \t]+/g, ' ');
+  const num = x => Number(String(x).replace(/,/g, ''));
+  const ts = new Date(n.ts);
+  const p = {amount: 0, date: isNaN(ts) ? today() : ymd(ts), merchant: '', last4: '', source: app || '通知'};
+  const date = (y, m, d) => { p.date = `${Number(y) < 1911 ? Number(y) + 1911 : y}-${pad(m)}-${pad(d)}`; };
+  let m;
+  if ((m = t.match(/末四碼\s*(\d{4})/))) p.last4 = m[1];
+  if (/商店名稱|授權時間/.test(t)) {                       // 玉山
+    p.source = '玉山';
+    if ((m = t.match(/消費金額\s*:\s*([\d,]+(?:\.\d+)?)/) || t.match(/消費\s*([\d,]+)\s*元/))) p.amount = num(m[1]);
+    if ((m = t.match(/授權時間\s*:\s*(\d{2,4})\/(\d{1,2})\/(\d{1,2})/))) date(m[1], m[2], m[3]);
+    if ((m = t.match(/商店名稱\s*:\s*([^\n]+)/))) p.merchant = m[1].trim();
+  } else if (/刷卡/.test(t) && /金額\s*NT\$/.test(t)) {     // 國泰世華
+    p.source = '國泰世華';
+    if ((m = t.match(/金額\s*NT\$\s*([\d,]+(?:\.\d+)?)/))) p.amount = num(m[1]);
+    if ((m = t.match(/於\s*(\d{4})\/(\d{1,2})\/(\d{1,2})/))) date(m[1], m[2], m[3]);
+    if ((m = t.match(/在\s*([^\n]+?)\s*刷卡/))) p.merchant = m[1].trim();
+  } else if (/LINE\s*Pay/i.test(app + ' ' + t) || (/付款/.test(t) && /NT\$/.test(t))) { // LINE Pay
+    p.source = 'LINE Pay';
+    if ((m = t.match(/NT\$\s*([\d,]+(?:\.\d+)?)/))) p.amount = num(m[1]);
+    if ((m = t.match(/(\d{4})\.(\d{1,2})\.(\d{1,2})/))) date(m[1], m[2], m[3]);
+  } else if ((m = t.match(/(?:NT\$|NTD|金額|消費)\D{0,6}?([\d,]+(?:\.\d+)?)/))) {       // 其他：盡量抓金額
+    p.amount = num(m[1]);
+  }
+  if (!(p.amount > 0)) p.amount = 0;
+  return p;
+}
+function guessAcc(p) {
+  const A = S.accounts;
+  return (p.last4 && A.find(a => a.last4 === p.last4))
+    || (p.source === 'LINE Pay' && A.find(a => /line/i.test(a.name)))
+    || A.find(a => a.name.includes(p.source.slice(0, 2)))
+    || A.find(a => a.type === (p.source === 'LINE Pay' ? 'epay' : 'card')) || A[0] || null;
+}
+const CAT_HINTS = [
+  [/youtube|netflix|spotify|disney|steam|kkbox|電影/i, '娛樂'], [/蝦皮|樂購|momo|pchome|yahoo|amazon|uniqlo/i, '購物'],
+  [/uber ?eats|foodpanda|麥當勞|星巴克|7-?eleven|統一超商|全家|萊爾富|餐|咖啡/i, '餐飲'],
+  [/高鐵|台鐵|捷運|uber|加油|中油|停車|悠遊/i, '交通'], [/全聯|家樂福|好市多|costco|大潤發|屈臣氏|康是美/i, '日用'],
+  [/apple|google \*(?!youtube)|microsoft|燦坤/i, '3C'], [/診所|醫院|藥局/i, '醫療'],
+];
+function guessCat(merchant) {
+  const ex = S.categories.filter(c => c.kind === 'exp');
+  if (merchant) {
+    const prev = sortRecs(S.records).find(r => r.type === 'exp' && r.merchant === merchant && ex.some(c => c.id === r.cat));
+    if (prev) return prev.cat;
+    for (const [re, name] of CAT_HINTS) if (re.test(merchant)) { const c = ex.find(x => x.name === name); if (c) return c.id; }
+  }
+  return ex[0] ? ex[0].id : null;
+}
+function inboxDraft(n) {
+  const p = parseNotif(n), a = guessAcc(p);
+  return {id: null, inboxId: n.id, type: 'exp', amount: p.amount || '', date: p.date, cat: guessCat(p.merchant || p.source),
+    acc: a ? a.id : null, toAcc: null, merchant: p.merchant || (p.source === 'LINE Pay' ? 'LINE Pay' : ''), note: '', _p: p};
+}
+async function syncInbox(manual) {
+  const a = S.auto;
+  if (!a.url || !a.key) { if (manual) toast('請先完成通知自動記帳設定'); return 0; }
+  try {
+    const res = await fetch(`${a.url}${a.url.includes('?') ? '&' : '?'}key=${encodeURIComponent(a.key)}&after=${a.last || 1}`);
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error === 'bad key' ? '金鑰不正確' : (d.error || '伺服器拒絕'));
+    const rows = d.rows || [];
+    rows.forEach(r => S.inbox.push({id: uid(), row: r.row, app: r.app, title: r.title, text: r.text, ts: r.ts}));
+    a.last = Math.max(1, Number(d.last) || 1); save();
+    if (rows.length) toast(`收到 ${rows.length} 則新通知`); else if (manual) toast('沒有新的通知');
+    return rows.length;
+  } catch (e) { if (manual) toast('連線失敗：' + (e.message || e)); return 0; }
+}
+function drawInbox() {
+  const items = S.inbox.map(n => {
+    const d = inboxDraft(n), p = d._p;
+    const dup = p.amount && S.records.some(r => r.type === 'exp' && r.amount === p.amount && r.date === p.date);
+    const raw = esc((String(n.title || '') + ' ' + String(n.text || '')).replace(/\s+/g, ' ').slice(0, 80));
+    const head = p.amount
+      ? `<div class="t1">${esc(d.merchant || p.source)}</div><div class="t2">${esc(p.date)} · ${esc(p.source)} · ${esc(d.acc ? acc(d.acc).name : '未指定帳戶')} · ${esc(cat(d.cat).name)}</div>`
+      : `<div class="t1">無法辨識金額</div>`;
+    return `<div class="dayhead" style="display:block"><button class="row" style="width:100%;text-align:left" data-act="inboxEdit" data-v="${n.id}">
+        <div class="ico">📥</div><div class="sp">${head}</div>${p.amount ? `<b class="num exp">-${fmt(p.amount)}</b>` : ''}</button>
+      <div class="t2" style="white-space:normal;margin:6px 0">${dup ? '<b class="exp">⚠ 帳本裡已有同日同金額的紀錄</b><br>' : ''}${raw}</div>
+      <div class="btns" style="margin:0 0 4px">${p.amount ? `<button class="btn" style="padding:8px" data-act="inboxAdd" data-v="${n.id}">新增</button>` : ''}
+        <button class="btn ghost" style="padding:8px" data-act="inboxEdit" data-v="${n.id}">修改後新增</button>
+        <button class="btn ghost" style="padding:8px" data-act="inboxSkip" data-v="${n.id}">忽略</button></div></div>`;
+  }).join('');
+  openSheet(`<h3>匯入紀錄<button class="muted" data-act="close" aria-label="關閉">✕</button></h3>
+    <div class="btns" style="margin:0 0 12px"><button class="btn ghost" data-act="syncNow">🔄 立即檢查</button>
+      ${S.inbox.length > 1 ? `<button class="btn" data-act="inboxAddAll">全部新增</button>` : ''}</div>
+    ${items || `<div class="empty">沒有待確認的通知${S.auto.url ? '' : '<br>請先到「設定 → 通知自動記帳設定」完成連結'}</div>`}`);
+}
+function addFromInbox(n) {
+  const d = inboxDraft(n);
+  if (!(d.amount > 0) || !d.acc) return false;
+  S.records.push({id: uid(), type: 'exp', amount: d.amount, date: d.date, acc: d.acc, cat: d.cat, merchant: d.merchant, note: '', ts: Date.now()});
+  S.inbox = S.inbox.filter(x => x.id !== n.id);
+  return true;
+}
+function drawAuto() {
+  openSheet(`<h3>通知自動記帳設定<button class="muted" data-act="close" aria-label="關閉">✕</button></h3>
+    <p class="small muted" style="margin-top:0">手機上的 MacroDroid 把刷卡／付款通知送到你自己的 Google 試算表，這個網頁再從試算表讀進「匯入紀錄」。
+      完整步驟請看 <a href="automation/" style="color:var(--accent)">設定教學</a>。</p>
+    <label class="f"><span>Apps Script 網頁應用程式網址（結尾是 /exec）</span><input class="inp" id="au-url" type="url" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(S.auto.url)}" /></label>
+    <label class="f"><span>金鑰（和 Apps Script 裡的 KEY 相同）</span><input class="inp" id="au-key" type="password" autocomplete="off" value="${esc(S.auto.key)}" /></label>
+    <button class="btn" data-act="saveAuto">儲存並測試連線</button>
+    <button class="btn ghost" style="margin-top:8px" data-act="autoReset">從第一則通知重新讀取</button>
+    ${S.auto.url ? `<button class="btn danger" data-act="autoOff">停用通知自動記帳</button>` : ''}`);
 }
 
 /* ========== 匯出 / 匯入 ========== */
@@ -500,7 +622,10 @@ const A = {
     if (D.type === 'xfer') r.toAcc = D.toAcc; else { r.cat = D.cat; r.merchant = (D.merchant || '').trim(); }
     const i = S.records.findIndex(x => x.id === r.id);
     if (i >= 0) S.records[i] = r; else S.records.push(r);
+    const fromInbox = D.inboxId;
+    if (fromInbox) S.inbox = S.inbox.filter(x => x.id !== fromInbox);
     save(); const isNew = i < 0; closeSheet(); ui.month = r.date.slice(0, 7); render(); toast(isNew ? '已新增紀錄' : '已更新紀錄');
+    if (fromInbox && S.inbox.length) drawInbox();
   },
   delRec() { if (!confirm('刪除這筆紀錄？')) return; S.records = S.records.filter(x => x.id !== D.id); save(); closeSheet(); render(); toast('已刪除紀錄'); },
   editAcc(el) { drawAcc(el.dataset.v); },
@@ -508,8 +633,9 @@ const A = {
     const name = $('#a-name').value.trim(), type = $('#a-type').value, bal = Number($('#a-bal').value) || 0;
     if (!name) return toast('請輸入名稱');
     const a = S.accounts.find(x => x.id === el.dataset.v);
-    if (a) { a.init = (Number(a.init) || 0) + (bal - balance(a)); a.name = name; a.type = type; }
-    else S.accounts.push({id: uid(), name, type, init: bal});
+    const last4 = $('#a-last4').value.replace(/\D/g, '').slice(0, 4);
+    if (a) { a.init = (Number(a.init) || 0) + (bal - balance(a)); a.name = name; a.type = type; a.last4 = last4; }
+    else S.accounts.push({id: uid(), name, type, init: bal, last4});
     save(); closeSheet(); render(); toast(a ? '已更新帳戶' : '已新增帳戶');
   },
   delAcc(el) {
@@ -537,6 +663,29 @@ const A = {
     S.categories = S.categories.filter(c => c.id !== D.id); delete S.budget.cats[D.id];
     save(); const k = D.kind; render(); drawCats(k); toast('已刪除分類');
   },
+  inbox() { drawInbox(); },
+  async syncNow() { await syncInbox(true); render(); drawInbox(); },
+  inboxEdit(el) { const n = S.inbox.find(x => x.id === el.dataset.v); if (!n) return; if (!S.accounts.length) return toast('先建立一個帳戶，紀錄才有地方放'); D = inboxDraft(n); drawRec(); },
+  inboxAdd(el) {
+    const n = S.inbox.find(x => x.id === el.dataset.v); if (!n) return;
+    if (!addFromInbox(n)) return toast('資料不完整，請用「修改後新增」');
+    save(); render(); toast('已新增紀錄'); S.inbox.length ? drawInbox() : closeSheet();
+  },
+  inboxAddAll() {
+    let k = 0; S.inbox.slice().forEach(n => { if (addFromInbox(n)) k++; });
+    save(); render(); toast(`已新增 ${k} 筆紀錄${S.inbox.length ? `，${S.inbox.length} 則需手動確認` : ''}`); S.inbox.length ? drawInbox() : closeSheet();
+  },
+  inboxSkip(el) { S.inbox = S.inbox.filter(x => x.id !== el.dataset.v); save(); render(); toast('已忽略'); S.inbox.length ? drawInbox() : closeSheet(); },
+  autoSet() { drawAuto(); },
+  async saveAuto() {
+    const url = $('#au-url').value.trim(), key = $('#au-key').value.trim();
+    if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(url)) return toast('網址格式不對，結尾應該是 /exec');
+    if (!key) return toast('請輸入金鑰');
+    S.auto.url = url; S.auto.key = key; save();
+    await syncInbox(true); render(); if (S.inbox.length) drawInbox(); else closeSheet();
+  },
+  async autoReset() { if (!confirm('從試算表第一則通知重新讀取？已處理過的通知會再出現一次。')) return; S.auto.last = 1; save(); await syncInbox(true); render(); drawInbox(); },
+  autoOff() { if (!confirm('停用通知自動記帳？（試算表裡的資料不會被刪除）')) return; S.auto = {url: '', key: '', last: 1}; save(); closeSheet(); render(); toast('已停用'); },
   budget() { drawBudget(); },
   saveBudget() {
     S.budget.total = Math.max(0, Number($('#b-total').value) || 0); S.budget.cats = {};
@@ -571,8 +720,7 @@ document.addEventListener('change', e => {
       const d = JSON.parse(fr.result);
       if (!d || !Array.isArray(d.records) || !Array.isArray(d.accounts) || !Array.isArray(d.categories)) throw 0;
       if (!confirm(`匯入 ${d.records.length} 筆紀錄並取代目前所有資料？`)) return;
-      d.budget = d.budget || {total: 0, cats: {}}; d.budget.cats = d.budget.cats || {};
-      S = d; save(); applyTheme(); render(); toast('已還原備份');
+      S = norm(d); save(); applyTheme(); render(); toast('已還原備份');
     } catch (err) { toast('讀取失敗：不是有效的備份檔'); }
   };
   fr.readAsText(e.target.files[0]); e.target.value = '';
@@ -585,6 +733,9 @@ function render() {
   document.querySelectorAll('nav [data-act="tab"]').forEach(b => b.classList.toggle('on', b.dataset.v === ui.tab));
 }
 applyTheme(); render();
+const autoSync = () => syncInbox(false).then(n => { if (n && !$('#mask').classList.contains('show')) render(); });
+autoSync();
+document.addEventListener('visibilitychange', () => { if (!document.hidden) autoSync(); });
 </script>
 </body>
 </html>

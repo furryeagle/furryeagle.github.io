@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>通知自動記帳設定教學</title>
+<style>
+:root{--bg:#f4f5f9;--card:#fff;--text:#16181d;--muted:#6b7280;--line:#e5e7eb;--accent:#4f46e5}
+@media (prefers-color-scheme: dark){:root{--bg:#0f1115;--card:#1a1d24;--text:#eceef2;--muted:#9aa1ad;--line:#2a2e38;--accent:#818cf8}}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif}
+main{max-width:680px;margin:0 auto;padding:16px}
+section{background:var(--card);border-radius:16px;padding:4px 18px 12px;margin-bottom:14px}
+h1{font-size:22px} h2{font-size:17px;margin-top:16px}
+a{color:var(--accent)} .muted{color:var(--muted);font-size:13.5px}
+code,pre{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;background:var(--bg);border-radius:6px}
+code{padding:1px 5px} pre{padding:10px 12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+li{margin:4px 0}
+</style>
+</head>
+<body><main>
+<p><a href="../">‹ 回到我的帳本</a></p>
+<h1>通知自動記帳設定教學</h1>
+<p class="muted">流程：手機收到刷卡／付款通知 → MacroDroid 轉送 → 你自己的 Google 試算表 → 記帳網頁的「匯入紀錄」。約 15 分鐘，全部免費，資料只會經過你自己的 Google 帳號。</p>
+
+<section>
+<h2>一、建立收件用的 Google 試算表</h2>
+<ol>
+<li>到 Google 雲端硬碟新增一份空白試算表，名稱隨意（例如「記帳通知」）。</li>
+<li>選單「擴充功能 → Apps Script」，把編輯器裡原本的內容全部刪掉。</li>
+<li>打開 <a href="Code.gs" target="_blank" rel="noopener">Code.gs</a>，全選複製、貼進編輯器。</li>
+<li>把最上面的 <code>KEY</code> 改成你自己的一串亂碼（至少 20 個字元的英數字）。這就是金鑰，<b>不要給別人</b>。</li>
+<li>右上角「部署 → 新增部署作業」，類型選「網頁應用程式」：
+  <ul><li>執行身分：<b>我</b></li><li>誰可以存取：<b>所有人</b></li></ul>
+  按「部署」，第一次會要求授權，同意即可。</li>
+<li>複製「網頁應用程式網址」，結尾是 <code>/exec</code>。</li>
+</ol>
+<p class="muted">「所有人」是指不用登入 Google 就能呼叫這個網址，但沒有金鑰的請求一律會被拒絕。日後若改了程式，要到「部署 → 管理部署作業」編輯並選「新版本」才會生效。</p>
+</section>
+
+<section>
+<h2>二、在 MacroDroid 建立巨集</h2>
+<ol>
+<li><b>觸發條件</b>：「裝置事件 → 通知 → 收到通知」。
+  <ul>
+  <li>銀行：選擇應用程式勾「國泰世華 CUBE」「玉山 Wallet」（或你實際收到刷卡通知的 App），文字內容選「任何」。</li>
+  <li>LINE Pay：再加一個觸發條件，應用程式選「LINE」，文字內容選「包含」並填 <code>付款</code>。<b>這個過濾一定要設</b>，否則你的 LINE 聊天訊息也會被送進試算表。</li>
+  </ul></li>
+<li><b>動作</b>：「網路 → HTTP 請求」。
+  <ul>
+  <li>請求方法：<code>POST</code></li>
+  <li>網址：<code>你的網頁應用程式網址?key=你的金鑰</code></li>
+  <li>內容類型：<code>text/plain</code></li>
+  <li>內文：共三行，用輸入框旁的「…」（魔術文字）依序插入<br>第 1 行「通知應用程式名稱」<br>第 2 行「通知標題」<br>第 3 行「通知文字」</li>
+  </ul>
+  插入後看起來大致像這樣（實際符號以你的 MacroDroid 版本為準）：
+<pre>[not_app_name]
+[not_title]
+[notification]</pre></li>
+<li>儲存巨集並開啟。到手機「設定 → 電池」把 MacroDroid 設為不受電池最佳化限制，否則背景可能收不到通知。</li>
+</ol>
+</section>
+
+<section>
+<h2>三、連結記帳網頁</h2>
+<ol>
+<li>打開「我的帳本 → 設定 → 通知自動記帳設定」，貼上網址與金鑰，按「儲存並測試連線」。</li>
+<li>到「帳戶」把信用卡的<b>卡號末四碼</b>填好，通知才會自動對到正確的卡。</li>
+<li>新增一個類型為「電子支付」、名稱含「LINE」的帳戶（例如「LINE Pay」），LINE Pay 的通知會記到這裡。</li>
+</ol>
+<p>之後每次打開記帳網頁都會自動檢查新通知，放進「匯入紀錄」。你可以逐筆「新增」「修改後新增」「忽略」，或按「全部新增」。</p>
+</section>
+
+<section>
+<h2>目前看得懂的通知</h2>
+<ul>
+<li><b>國泰世華</b>刷卡通知：金額、末四碼、日期、商店。</li>
+<li><b>玉山</b>信用卡消費通知：金額、末四碼、授權日期（民國年會自動換算）、商店名稱。</li>
+<li><b>LINE Pay</b>付款通知：金額、日期。通知裡沒有店家名稱，店家會先填「LINE Pay」，請用「修改後新增」補上。</li>
+<li>其他通知：只會盡量抓出金額，抓不到時顯示「無法辨識金額」，可手動修改或忽略。</li>
+</ul>
+</section>
+
+<section>
+<h2>測試與常見問題</h2>
+<ul>
+<li><b>先測試</b>：在 MacroDroid 巨集畫面按「測試動作」，試算表的「通知」工作表應該會多一列。</li>
+<li><b>試算表沒有新增列</b>：檢查網址結尾是否為 <code>/exec</code>、<code>?key=</code> 後面的金鑰是否和程式裡的 <code>KEY</code> 完全相同。</li>
+<li><b>網頁顯示「金鑰不正確」</b>：同上；如果改過 <code>KEY</code>，記得重新部署新版本。</li>
+<li><b>通知太多雜訊</b>：在 MacroDroid 的觸發條件把文字內容改成「包含」特定字，例如 <code>刷卡</code>、<code>消費</code>。</li>
+<li><b>金鑰外流了</b>：改掉程式裡的 <code>KEY</code> 並重新部署，再更新 MacroDroid 與記帳網頁的設定。</li>
+</ul>
+</section>
+</main></body>
+</html>
