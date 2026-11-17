@@ -364,7 +364,8 @@ function viewSet() {
       ${row('cats', '🏷️', '收入分類', `${S.categories.filter(c => c.kind === 'inc').length} 個`, 'inc')}</div>
     <div class="card"><h2>自動記帳</h2>
       ${row('inbox', '📥', '匯入紀錄', S.inbox.length ? `${S.inbox.length} 則待確認` : '沒有待確認的通知')}
-      ${row('autoSet', '🤖', '通知自動記帳設定', S.auto.url ? '已連結' : '尚未設定')}</div>
+      ${row('autoSet', '🤖', '通知自動記帳設定', S.auto.url ? '已連結' : '尚未設定')}
+      ${row('importInv', '🧾', '匯入電子發票', '財政部「消費發票彙整通知」的 CSV 附件')}</div>
     <div class="card"><h2>一般</h2>
       ${row('theme', '🌓', '主題顏色', th[S.theme || 'auto'])}</div>
     <div class="card"><h2>資料</h2>
@@ -374,7 +375,8 @@ function viewSet() {
       ${row('sample', '🧪', '載入範例資料', '加入近三個月的示範紀錄')}
       ${row('wipe', '🗑️', '清除全部資料', '無法復原，請先備份')}</div>
     <p class="small muted" style="text-align:center">資料只存在這台裝置的這個瀏覽器，不會上傳。<br>清除瀏覽資料或換裝置前，請先匯出備份。</p>
-    <input type="file" id="file" accept="application/json,.json" hidden />`;
+    <input type="file" id="file" accept="application/json,.json" hidden />
+    <input type="file" id="invfile" accept=".csv,text/csv,text/plain" hidden />`;
 }
 
 /* ========== 紀錄表單 ========== */
@@ -503,7 +505,39 @@ function guessCat(merchant) {
   }
   return ex[0] ? ex[0].id : null;
 }
+// 財政部電子發票「消費發票彙整通知」附件：M|載具名稱|載具號碼|發票日期|商店統編|商店店名|發票號碼|總金額|發票狀態|，D|發票號碼|小計|品項名稱|
+function parseInvoiceCsv(text) {
+  const map = new Map();
+  text.replace(/^\ufeff/, '').split(/\r?\n/).forEach(line => {
+    const f = line.split('|').map(x => x.trim());
+    if (f[0] === 'M') {
+      let date = f[3], ban = f[4], seller = f[5], no = f[6], amt = f[7], status = f[8] || '';
+      if (!/^\d{8}$/.test(date || '') || !/^[A-Z]{2}-?\d{8}$/.test(no || '')) { // 欄位順序不同時，改用內容特徵找
+        const ni = f.findIndex(x => /^[A-Z]{2}-?\d{8}$/.test(x)), di = f.findIndex(x => /^20\d{6}$/.test(x));
+        if (ni < 0 || di < 0) return;
+        no = f[ni]; date = f[di]; amt = f[ni + 1]; status = f[ni + 2] || ''; seller = f[ni - 1] || ''; ban = f[ni - 2] || '';
+      }
+      const amount = Number(String(amt).replace(/,/g, ''));
+      if (/作廢|註銷/.test(status) || !(amount > 0)) return;
+      no = no.replace('-', '');
+      map.set(no, {no, date: `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`, ban, seller, amount, items: []});
+    } else if (f[0] === 'D') {
+      const v = map.get((f[1] || '').replace('-', '')); if (v && f[3]) v.items.push(f[3]);
+    }
+  });
+  return [...map.values()];
+}
+// 找出可能是同一筆消費的既有紀錄（同金額、日期相差一天內、還沒對過發票）
+function invMatch(v) {
+  const t = new Date(v.date + 'T00:00:00').getTime();
+  return S.records.find(r => r.type === 'exp' && !r.inv && r.amount === v.amount && Math.abs(new Date(r.date + 'T00:00:00').getTime() - t) <= 86400000) || null;
+}
 function inboxDraft(n) {
+  if (n.inv) {
+    const v = n.inv, a = S.accounts.find(x => x.type === 'cash') || S.accounts[0];
+    return {id: null, inboxId: n.id, type: 'exp', amount: v.amount, date: v.date, cat: guessCat(v.seller), acc: a ? a.id : null, toAcc: null,
+      merchant: v.seller, note: v.items.join('、').slice(0, 60), inv: v.no, _p: {amount: v.amount, date: v.date, source: '電子發票', merchant: v.seller}, _m: invMatch(v)};
+  }
   const p = parseNotif(n), a = guessAcc(p);
   return {id: null, inboxId: n.id, type: 'exp', amount: p.amount || '', date: p.date, cat: guessCat(p.merchant || p.source),
     acc: a ? a.id : null, toAcc: null, merchant: p.merchant || (p.source === 'LINE Pay' ? 'LINE Pay' : ''), note: '', _p: p};
@@ -525,16 +559,17 @@ async function syncInbox(manual) {
 function drawInbox() {
   const items = S.inbox.map(n => {
     const d = inboxDraft(n), p = d._p;
-    const dup = p.amount && S.records.some(r => r.type === 'exp' && r.amount === p.amount && r.date === p.date);
-    const raw = esc((String(n.title || '') + ' ' + String(n.text || '')).replace(/\s+/g, ' ').slice(0, 80));
+    const dup = !n.inv && p.amount && S.records.some(r => r.type === 'exp' && r.amount === p.amount && r.date === p.date);
+    const raw = esc(n.inv ? `${n.inv.no}　${n.inv.items.join('、')}`.slice(0, 80) : (String(n.title || '') + ' ' + String(n.text || '')).replace(/\s+/g, ' ').slice(0, 80));
+    const mg = d._m ? `<b style="color:var(--accent)">帳本已有這筆（${esc(d._m.date)} ${esc(acc(d._m.acc).name)}），按「合併」補上店家與品項</b><br>` : '';
     const head = p.amount
       ? `<div class="t1">${esc(d.merchant || p.source)}</div><div class="t2">${esc(p.date)} · ${esc(p.source)} · ${esc(d.acc ? acc(d.acc).name : '未指定帳戶')} · ${esc(cat(d.cat).name)}</div>`
       : `<div class="t1">無法辨識金額</div>`;
     return `<div class="dayhead" style="display:block"><button class="row" style="width:100%;text-align:left" data-act="inboxEdit" data-v="${n.id}">
         <div class="ico">📥</div><div class="sp">${head}</div>${p.amount ? `<b class="num exp">-${fmt(p.amount)}</b>` : ''}</button>
-      <div class="t2" style="white-space:normal;margin:6px 0">${dup ? '<b class="exp">⚠ 帳本裡已有同日同金額的紀錄</b><br>' : ''}${raw}</div>
-      <div class="btns" style="margin:0 0 4px">${p.amount ? `<button class="btn" style="padding:8px" data-act="inboxAdd" data-v="${n.id}">新增</button>` : ''}
-        <button class="btn ghost" style="padding:8px" data-act="inboxEdit" data-v="${n.id}">修改後新增</button>
+      <div class="t2" style="white-space:normal;margin:6px 0">${dup ? '<b class="exp">⚠ 帳本裡已有同日同金額的紀錄</b><br>' : ''}${mg}${raw}</div>
+      <div class="btns" style="margin:0 0 4px">${p.amount ? `<button class="btn" style="padding:8px" data-act="inboxAdd" data-v="${n.id}">${d._m ? '合併' : '新增'}</button>` : ''}
+        <button class="btn ghost" style="padding:8px" data-act="inboxEdit" data-v="${n.id}">${d._m ? '另外新增' : '修改後新增'}</button>
         <button class="btn ghost" style="padding:8px" data-act="inboxSkip" data-v="${n.id}">忽略</button></div></div>`;
   }).join('');
   openSheet(`<h3>匯入紀錄<button class="muted" data-act="close" aria-label="關閉">✕</button></h3>
@@ -545,7 +580,15 @@ function drawInbox() {
 function addFromInbox(n) {
   const d = inboxDraft(n);
   if (!(d.amount > 0) || !d.acc) return false;
-  S.records.push({id: uid(), type: 'exp', amount: d.amount, date: d.date, acc: d.acc, cat: d.cat, merchant: d.merchant, note: '', ts: Date.now()});
+  if (d._m) { // 發票對到既有紀錄：只補資料，不重複記帳
+    const r = d._m; r.inv = d.inv;
+    if (!r.merchant || r.merchant === 'LINE Pay') r.merchant = d.merchant;
+    if (!r.note) r.note = d.note;
+  } else {
+    const r = {id: uid(), type: 'exp', amount: d.amount, date: d.date, acc: d.acc, cat: d.cat, merchant: d.merchant, note: d.note || '', ts: Date.now()};
+    if (d.inv) r.inv = d.inv;
+    S.records.push(r);
+  }
   S.inbox = S.inbox.filter(x => x.id !== n.id);
   return true;
 }
@@ -619,7 +662,7 @@ const A = {
     if (!D.acc) return toast('請選擇帳戶');
     if (D.type === 'xfer' && D.acc === D.toAcc) return toast('轉出與轉入帳戶不能相同');
     const r = {id: D.id || uid(), type: D.type, amount, date: D.date, acc: D.acc, note: D.note.trim(), ts: D.ts || Date.now()};
-    if (D.type === 'xfer') r.toAcc = D.toAcc; else { r.cat = D.cat; r.merchant = (D.merchant || '').trim(); }
+    if (D.type === 'xfer') r.toAcc = D.toAcc; else { r.cat = D.cat; r.merchant = (D.merchant || '').trim(); if (D.inv) r.inv = D.inv; }
     const i = S.records.findIndex(x => x.id === r.id);
     if (i >= 0) S.records[i] = r; else S.records.push(r);
     const fromInbox = D.inboxId;
@@ -669,11 +712,12 @@ const A = {
   inboxAdd(el) {
     const n = S.inbox.find(x => x.id === el.dataset.v); if (!n) return;
     if (!addFromInbox(n)) return toast('資料不完整，請用「修改後新增」');
-    save(); render(); toast('已新增紀錄'); S.inbox.length ? drawInbox() : closeSheet();
+    save(); render(); toast('已處理'); S.inbox.length ? drawInbox() : closeSheet();
   },
+  importInv() { $('#invfile').click(); },
   inboxAddAll() {
     let k = 0; S.inbox.slice().forEach(n => { if (addFromInbox(n)) k++; });
-    save(); render(); toast(`已新增 ${k} 筆紀錄${S.inbox.length ? `，${S.inbox.length} 則需手動確認` : ''}`); S.inbox.length ? drawInbox() : closeSheet();
+    save(); render(); toast(`已處理 ${k} 筆${S.inbox.length ? `，${S.inbox.length} 則需手動確認` : ''}`); S.inbox.length ? drawInbox() : closeSheet();
   },
   inboxSkip(el) { S.inbox = S.inbox.filter(x => x.id !== el.dataset.v); save(); render(); toast('已忽略'); S.inbox.length ? drawInbox() : closeSheet(); },
   autoSet() { drawAuto(); },
@@ -724,6 +768,20 @@ document.addEventListener('change', e => {
     } catch (err) { toast('讀取失敗：不是有效的備份檔'); }
   };
   fr.readAsText(e.target.files[0]); e.target.value = '';
+});
+document.addEventListener('change', async e => {
+  if (e.target.id !== 'invfile' || !e.target.files[0]) return;
+  const buf = await e.target.files[0].arrayBuffer(); e.target.value = '';
+  let text = new TextDecoder('utf-8').decode(buf);
+  if (text.includes('\ufffd')) { try { text = new TextDecoder('big5').decode(buf); } catch (err) {} }
+  const list = parseInvoiceCsv(text);
+  if (!list.length) return toast('讀不到發票資料，請確認是彙整通知的 CSV 附件');
+  const known = new Set([...S.records.map(r => r.inv), ...S.inbox.map(n => n.inv && n.inv.no)].filter(Boolean));
+  const fresh = list.filter(v => !known.has(v.no));
+  fresh.forEach(v => S.inbox.push({id: uid(), inv: v, ts: v.date}));
+  save(); render();
+  toast(`讀到 ${list.length} 張發票，${fresh.length} 張待確認${list.length - fresh.length ? `，${list.length - fresh.length} 張已匯入過` : ''}`);
+  if (fresh.length) drawInbox();
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
 
